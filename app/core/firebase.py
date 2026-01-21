@@ -1,16 +1,26 @@
 # app/core/firebase.py
 
+import json
 import firebase_admin
 from firebase_admin import credentials, messaging
+from app.config import settings
 
 _firebase_initialized = False
 
 def init_firebase():
     global _firebase_initialized
     if not _firebase_initialized:
-        cred = credentials.Certificate(
-            "app/core/firebase-service-account.json"
-        )
+        if settings.FIREBASE_CREDENTIALS:
+            try:
+                cred_dict = json.loads(settings.FIREBASE_CREDENTIALS)
+                cred = credentials.Certificate(cred_dict)
+            except json.JSONDecodeError:
+                print("Error: Invalid JSON in FIREBASE_CREDENTIALS env var")
+                raise
+        else:
+            cred = credentials.Certificate(
+                "app/core/firebase-service-account.json"
+            )
         firebase_admin.initialize_app(cred)
         _firebase_initialized = True
 

@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     
     # CORS
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
+
+    # Firebase
+    FIREBASE_CREDENTIALS: str | None = None
     
     @property
     def allowed_origins_list(self) -> List[str]:
