@@ -17,6 +17,7 @@ config = context.config
 # Override sqlalchemy.url with the one from settings
 # Need to escape % for ConfigParser (% -> %%)
 database_url = settings.DATABASE_URL.replace('%', '%%')
+print(f"DEBUG: Using Database URL: {database_url.split('@')[-1] if '@' in database_url else 'INVALID_FORMAT'}")
 config.set_main_option("sqlalchemy.url", database_url)
 
 # Interpret the config file for Python logging.
