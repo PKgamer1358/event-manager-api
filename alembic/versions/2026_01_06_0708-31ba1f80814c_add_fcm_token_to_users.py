@@ -27,8 +27,15 @@ def upgrade() -> None:
     op.drop_index(op.f('ix_colleges_id'), table_name='colleges')
     op.drop_index(op.f('ix_colleges_name'), table_name='colleges')
     op.drop_table('colleges')
-    op.add_column('users', sa.Column('fcm_token', sa.String(), nullable=True))
-    op.drop_column('users', 'full_name')
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    user_columns = [c['name'] for c in inspector.get_columns('users')]
+
+    if 'fcm_token' not in user_columns:
+        op.add_column('users', sa.Column('fcm_token', sa.String(), nullable=True))
+    
+    if 'full_name' in user_columns:
+        op.drop_column('users', 'full_name')
     # ### end Alembic commands ###
 
 
