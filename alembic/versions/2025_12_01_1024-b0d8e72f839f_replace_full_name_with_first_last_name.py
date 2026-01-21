@@ -17,24 +17,33 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Add new columns
-    op.add_column('users', sa.Column('first_name', sa.String(length=120), nullable=True))
-    op.add_column('users', sa.Column('last_name', sa.String(length=120), nullable=True))
+    # Check existing columns to avoid errors if run multiple times or on partially consistent DB
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    columns = [c['name'] for c in inspector.get_columns('users')]
+
+    if 'first_name' not in columns:
+        op.add_column('users', sa.Column('first_name', sa.String(length=120), nullable=True))
+    
+    if 'last_name' not in columns:
+        op.add_column('users', sa.Column('last_name', sa.String(length=120), nullable=True))
     
     # Migrate existing full_name data (split by space, first word as first_name, rest as last_name)
-    connection = op.get_bind()
-    connection.execute(
-        sa.text("""
-            UPDATE users 
-            SET first_name = SPLIT_PART(full_name, ' ', 1),
-                last_name = SUBSTRING(full_name FROM POSITION(' ' IN full_name) + 1)
-            WHERE full_name IS NOT NULL AND full_name != ''
-        """)
-    )
-    connection.commit()
-    
-    # Drop old column
-    op.drop_column('users', 'full_name')
+    # Only run if full_name exists and we have the new columns
+    if 'full_name' in columns:
+        connection = op.get_bind()
+        connection.execute(
+            sa.text("""
+                UPDATE users 
+                SET first_name = SPLIT_PART(full_name, ' ', 1),
+                    last_name = SUBSTRING(full_name FROM POSITION(' ' IN full_name) + 1)
+                WHERE full_name IS NOT NULL AND full_name != ''
+            """)
+        )
+        connection.commit()
+        
+        # Drop old column
+        op.drop_column('users', 'full_name')
 
 
 def downgrade() -> None:
