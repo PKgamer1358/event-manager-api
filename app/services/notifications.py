@@ -1,0 +1,89 @@
+from datetime import datetime
+from apscheduler.schedulers.background import BackgroundScheduler
+from app.core.firebase import send_fcm
+from app.database import SessionLocal
+from app.models import Notification
+from datetime import datetime
+from sqlalchemy.orm import Session
+from app.database import SessionLocal
+from app.models import Notification
+from app.services.push import send_push_notification  # adjust if needed
+scheduler = BackgroundScheduler()
+scheduler.start()
+
+def store_web_notification(user_id: int, title: str, body: str):
+    db = SessionLocal()
+    try:
+        notif = Notification(
+            user_id=user_id,
+            title=title,
+            body=body,
+            notify_at=datetime.now()
+        )
+        db.add(notif)
+        db.commit()
+    finally:
+        db.close()
+
+def schedule_notification(
+    user_id: int,
+    title: str,
+    body: str,
+    notify_at: datetime
+):
+    db: Session = SessionLocal()
+    try:
+        notif = Notification(
+            user_id=user_id,
+            title=title,
+            body=body,
+            notify_at=notify_at,
+            delivered=False
+        )
+        db.add(notif)
+        db.commit()
+        # Optionally trigger scheduler if needed, but for now we rely on DB polling or external scheduler
+    finally:
+        db.close()
+def send_notification(user, title, body):
+    if user.fcm_token:
+        send_fcm(
+            token=user.fcm_token,
+            title=title,
+            body=body
+        )
+    else:
+        # web users will receive via polling / API trigger
+        store_web_notification(user.id, title, body)
+
+def send_due_notifications():
+    db: Session = SessionLocal()
+    try:
+        now = datetime.now()
+
+        notifications = (
+            db.query(Notification)            .filter(
+                Notification.notify_at <= now,
+                Notification.delivered == False
+            )
+            .all()
+        )
+
+        for n in notifications:
+            if n.user and n.user.fcm_token:
+                # 1-day reminder is sticky (cannot be swiped away)
+                is_sticky = n.title.startswith("Upcoming Tomorrow")
+
+                send_push_notification(
+                    fcm_token=n.user.fcm_token,
+                    title=n.title,
+                    body=n.body,
+                    sticky=is_sticky
+                )
+
+            n.delivered = True
+
+        db.commit()
+
+    finally:
+        db.close()
