@@ -13,7 +13,7 @@ from app.dependencies import get_current_user, get_current_admin_user
 from app.utils.permissions import can_manage_event
 from fastapi.responses import StreamingResponse
 import io
-import pandas as pd
+
 router = APIRouter(prefix="/events", tags=["Events"])
 
 def normalize_club(club: str | None):
