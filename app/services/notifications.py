@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import Notification
 from app.services.push import send_push_notification  # adjust if needed
-scheduler = BackgroundScheduler()
-scheduler.start()
+# scheduler = BackgroundScheduler()
+# scheduler.start()
 
 def store_web_notification(user_id: int, title: str, body: str):
     db = SessionLocal()
@@ -74,12 +74,15 @@ def send_due_notifications():
                 # 1-day reminder is sticky (cannot be swiped away)
                 is_sticky = n.title.startswith("Upcoming Tomorrow")
 
-                send_push_notification(
-                    fcm_token=n.user.fcm_token,
-                    title=n.title,
-                    body=n.body,
-                    sticky=is_sticky
-                )
+                try:
+                    send_push_notification(
+                        fcm_token=n.user.fcm_token,
+                        title=n.title,
+                        body=n.body,
+                        sticky=is_sticky
+                    )
+                except Exception as e:
+                    print(f"Error sending push notification to user {n.user_id}: {e}")
 
             n.delivered = True
 
