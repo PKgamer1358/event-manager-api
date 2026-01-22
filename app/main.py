@@ -18,6 +18,8 @@ start_scheduler()  # ✅ app startup
 
 # Ensure uploads directory exists
 os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 
 # Create FastAPI app
 app = FastAPI(

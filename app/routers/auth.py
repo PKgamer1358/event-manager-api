@@ -38,7 +38,7 @@ def signup(student_data: StudentSignup, db: Session = Depends(get_db)):
         first_name=student_data.first_name,
         last_name=student_data.last_name,
         is_admin=False,
-        is_active=False
+        is_active=True
     )
     new_user.set_password(student_data.password)
     
