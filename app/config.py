@@ -22,6 +22,11 @@ class Settings(BaseSettings):
 
     # Firebase
     FIREBASE_CREDENTIALS: str | None = None
+
+    # Cloudinary
+    CLOUDINARY_CLOUD_NAME: str | None = None
+    CLOUDINARY_API_KEY: str | None = None
+    CLOUDINARY_API_SECRET: str | None = None
     
     @property
     def allowed_origins_list(self) -> List[str]:

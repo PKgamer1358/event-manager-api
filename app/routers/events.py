@@ -13,6 +13,9 @@ from app.dependencies import get_current_user, get_current_admin_user
 from app.utils.permissions import can_manage_event
 from fastapi.responses import StreamingResponse
 import io
+import cloudinary
+import cloudinary.uploader
+
 
 router = APIRouter(prefix="/events", tags=["Events"])
 
@@ -243,42 +246,53 @@ async def upload_event_media(
             detail="Event not found"
         )
     
-    # Create directory structure
-    upload_dir = f"uploads/events/event_{event_id}"
-    os.makedirs(upload_dir, exist_ok=True)
-    
-    # Save file
-    file_path = f"{upload_dir}/{file.filename}"
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-        
-    # Create web-accessible URL (assuming mounted at /uploads)
-    # The file path is relative to app root.
-    # If we mount "uploads" at "/uploads", then the URL is /uploads/events/event_{id}/{filename}
-    file_url = f"/uploads/events/event_{event_id}/{file.filename}"
-    
-    # Determine file type
+    # Configure Cloudinary
+    cloudinary.config( 
+        cloud_name = settings.CLOUDINARY_CLOUD_NAME, 
+        api_key = settings.CLOUDINARY_API_KEY, 
+        api_secret = settings.CLOUDINARY_API_SECRET 
+    )
+
+    # Validate file type
     content_type = file.content_type
     file_type = "document"
     if content_type and content_type.startswith("image/"):
         file_type = "image"
     elif content_type == "application/pdf":
         file_type = "pdf"
+
+    # Upload to Cloudinary
+    try:
+        # folder="events/event_{event_id}" organizes files in Cloudinary
+        upload_result = cloudinary.uploader.upload(
+            file.file, 
+            folder=f"events/event_{event_id}",
+            resource_type="auto" # Auto-detect image vs raw (pdf/docs)
+        )
         
-    media = EventMedia(
-        event_id=event_id,
-        file_url=file_url,
-        file_type=file_type
-    )
-    
-    db.add(media)
-    db.commit()
-    db.refresh(media)
-    
-    return MessageResponse(
-        message="File uploaded successfully",
-        detail=f"Media ID: {media.id}"
-    )
+        # Get secure URL
+        file_url = upload_result.get("secure_url")
+        
+        media = EventMedia(
+            event_id=event_id,
+            file_url=file_url,
+            file_type=file_type
+        )
+        
+        db.add(media)
+        db.commit()
+        db.refresh(media)
+        
+        return MessageResponse(
+            message="File uploaded successfully",
+            detail=f"Media ID: {media.id}"
+        )
+    except Exception as e:
+        print(f"Cloudinary upload error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Image upload failed: {str(e)}"
+        )
 
 
 @router.get("/{event_id}/media", response_model=List[EventMediaResponse])
@@ -334,16 +348,70 @@ def delete_event_media(
             detail="Media file not found"
         )
 
-    # 4. Remove file from filesystem
+    # 4. Remove file from Cloudinary
     if media.file_url:
-        relative_path = media.file_url.lstrip("/") 
-        if os.path.exists(relative_path):
+        try:
+            # Extract public_id from URL
+            # Example: https://res.cloudinary.com/demo/image/upload/v1570979139/events/event_1/my_image.jpg
+            # Public ID: events/event_1/my_image
+            
+            # Simple extraction strategy:
+            # Split by '/' and take parts after 'upload/' (plus versioning handling if needed)
+            # Cloudinary usually returns public_id in upload response, but if we don't store it, we must extract.
+            # A safer way if possible is to store public_id in DB. 
+            # For now, let's try to parse or just leave it as orphan if parsing fails (fallback).
+            
+            # Better strategy: Let's assume standard Cloudinary URL structure
+            parts = media.file_url.split("/")
+            # Find the 'upload' segment index
             try:
-                os.remove(relative_path)
-            except Exception as e:
-                print(f"Error deleting file {relative_path}: {e}")
-        else:
-            print(f"File not found on disk: {relative_path}")
+                upload_idx = parts.index("upload")
+                # public_id starts after version (v12345) which is usually after upload
+                # But sometimes version is omitted.
+                # simpler: join from folder 'events' onwards and remove extension
+                
+                # We stored with folder=f"events/event_{event_id}"
+                # So we look for that.
+                
+                # Find index of 'events'
+                events_idx = parts.index("events")
+                # Join from there to end
+                public_id_with_ext = "/".join(parts[events_idx:])
+                # Remove extension
+                public_id = os.path.splitext(public_id_with_ext)[0]
+                
+                # Check resource type based on file_type
+                # Cloudinary delete defaults to image. For PDFs/docs (raw), we might need to specify.
+                # However, we used resource_type="auto" which might upload as image or raw.
+                # Map our file_type to cloudinary resource_type
+                res_type = "image"
+                if media.file_type == "pdf" or media.file_type == "document":
+                    # Check if it was uploaded as raw or image (PDFs can be both)
+                    # For simplicity, try 'image' first, then 'raw' if needed? 
+                    # Or just try to destroy.
+                    pass # Default is image.
+                
+                # Important: "raw" files need resource_type="raw" in destroy
+                # "image" and "video" are distinct.
+                
+                # For this implementation, we'll try to delete. 
+                # If it fails, we log it.
+                
+                cloudinary.config( 
+                    cloud_name = settings.CLOUDINARY_CLOUD_NAME, 
+                    api_key = settings.CLOUDINARY_API_KEY, 
+                    api_secret = settings.CLOUDINARY_API_SECRET 
+                )
+                
+                cloudinary.uploader.destroy(public_id)
+                # We might also need to try resource_type="raw" if it was a generic file
+                cloudinary.uploader.destroy(public_id, resource_type="raw")
+                
+            except ValueError:
+                print(f"Could not parse Cloudinary URL for deletion: {media.file_url}")
+
+        except Exception as e:
+            print(f"Error deleting file from Cloudinary: {e}")
 
     # 5. Delete DB record
     db.delete(media)

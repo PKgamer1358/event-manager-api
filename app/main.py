@@ -54,9 +54,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static directory for uploads (MUST be after app creation)
-os.makedirs("uploads", exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# Mount static directory for uploads (Removed: Using Cloudinary)
+# os.makedirs("uploads", exist_ok=True)
+# app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 
 # Include routers
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
