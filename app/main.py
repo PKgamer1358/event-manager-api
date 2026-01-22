@@ -37,8 +37,10 @@ origins = [
     "http://10.0.2.2",
     "http://10.0.2.2:3000",
     "http://10.0.2.2:8000",
-    "https://event-manager-ui-two.vercel.app"
+    "https://event-manager-ui-two.vercel.app",
+    "https://www.event-manager-ui-two.vercel.app"
 ]
+
 
 # Add origins from configuration
 if settings.ALLOWED_ORIGINS:
