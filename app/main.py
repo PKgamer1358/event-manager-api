@@ -31,6 +31,7 @@ app = FastAPI(
 
 
 
+
 origins = [
     "http://localhost",
     "http://localhost:3000",
@@ -40,6 +41,11 @@ origins = [
     "http://10.0.2.2:3000",
     "http://10.0.2.2:8000",
 ]
+
+# Add origins from configuration
+if settings.ALLOWED_ORIGINS:
+    origins.extend(settings.allowed_origins_list)
+
 
 app.add_middleware(
     CORSMiddleware,
