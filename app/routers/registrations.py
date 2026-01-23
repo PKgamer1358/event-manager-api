@@ -13,6 +13,9 @@ from app.utils.permissions import can_manage_event
 from datetime import datetime, timedelta
 from app.services.notifications import schedule_notification
 
+# IST Offset
+IST_OFFSET = timedelta(hours=5, minutes=30)
+
 router = APIRouter(prefix="/registrations", tags=["Registrations"])
 
 
@@ -35,7 +38,8 @@ def register_for_event(
         )
 
     # 1.5 Check if event is in the past
-    if event.start_time < datetime.now():
+    now_ist = datetime.utcnow() + IST_OFFSET
+    if event.start_time < now_ist:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot register for a past event"
@@ -94,20 +98,20 @@ def register_for_event(
     three_hours_before = event_start - timedelta(hours=3)
 
     # 1 Day Before (Sticky)
-    if one_day_before > datetime.now():
+    if one_day_before > now_ist:
         schedule_notification(
             user_id=current_user.id,
             title=f"Upcoming Tomorrow: {event.title}",
-            body=f"Don't forget! {event.title} is tomorrow at {event.start_time.strftime('%H:%M')}",
+            body=f"Don't forget! {event.title} is tomorrow at {event.start_time.strftime('%I:%M %p')}",
             notify_at=one_day_before
         )
 
     # 3 Hours Before (Standard)
-    if three_hours_before > datetime.now():
+    if three_hours_before > now_ist:
         schedule_notification(
             user_id=current_user.id,
             title=f"Starting Soon: {event.title}",
-            body=f"Get ready! {event.title} starts in 3 hours at {event.start_time.strftime('%H:%M')}",
+            body=f"Get ready! {event.title} starts soon at {event.start_time.strftime('%I:%M %p')}",
             notify_at=three_hours_before
         )
 
@@ -148,7 +152,8 @@ def unregister_from_event(
     
     # Check 5-day rule
     event = registration.event
-    if event.start_time - datetime.utcnow() <= timedelta(days=5):
+    now_ist = datetime.utcnow() + IST_OFFSET
+    if event.start_time - now_ist <= timedelta(days=5):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You cannot unregister within 5 days of the event start date"
@@ -302,17 +307,18 @@ def debug_event_timing(
     if not event:
         return {"error": "Event not found"}
         
-    now = datetime.now()
+    now_ist = datetime.utcnow() + IST_OFFSET
     one_day = event.start_time - timedelta(days=1)
     three_hours = event.start_time - timedelta(hours=3)
     
     return {
-        "server_now": now,
+        "server_now_utc": datetime.utcnow(),
+        "server_now_ist": now_ist,
         "event_start": event.start_time,
         "one_day_before": one_day,
-        "one_day_is_future": one_day > now,
+        "one_day_is_future": one_day > now_ist,
         "three_hours_before": three_hours,
-        "three_hours_is_future": three_hours > now,
+        "three_hours_is_future": three_hours > now_ist,
         "delta_hours": (three_hours - one_day).total_seconds() / 3600
     }
 
