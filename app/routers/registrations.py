@@ -11,7 +11,7 @@ from app.schemas import RegistrationResponse, RegistrationWithUser, MessageRespo
 from app.dependencies import get_current_user, get_current_admin_user
 from app.utils.permissions import can_manage_event
 from datetime import datetime, timedelta
-from app.services.notifications import schedule_notification
+from app.services.notifications import schedule_notification, send_notification
 
 # IST Offset
 IST_OFFSET = timedelta(hours=5, minutes=30)
@@ -91,6 +91,16 @@ def register_for_event(
     db.add(new_registration)
     db.commit()
     db.refresh(new_registration)
+
+    # 5.5️⃣ Send Immediate Confirmation
+    try:
+        send_notification(
+            user=current_user,
+            title="Registration Confirmed",
+            body=f"You have successfully registered for {event.title}!"
+        )
+    except Exception as e:
+        print(f"Error sending immediate notification: {e}")
 
     # 6️⃣ Schedule reminders
     event_start = event.start_time
