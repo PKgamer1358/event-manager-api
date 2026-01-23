@@ -98,14 +98,27 @@ def list_events(
     if club:
         query = query.filter(Event.club == club)
 
-    from datetime import datetime
-    now = datetime.now()
-
-    # 1. Upcoming events (start_time >= now)
-    upcoming_query = query.filter(Event.start_time >= now).order_by(Event.start_time.asc())
+    from datetime import datetime, timedelta
     
-    # 2. Past events (start_time < now)
-    past_query = query.filter(Event.start_time < now).order_by(Event.start_time.desc())
+    # 🕒 TIMEZONE FIX: 
+    # The server (Render/Vercel) likely runs in UTC.
+    # The database stores timestamps as "naive" (no timezone info), but users input them as local time (IST).
+    # So a user inputting "2:00 PM" is stored as "14:00".
+    # But "now" on the server is UTC (e.g. "08:30" when it is 14:00 in India).
+    # So "14:00" > "08:30", making the event look like it's in the future.
+    # To fix this, we need to compare the "stored time" with "server time converted to IST".
+    
+    # Approx check for India (UTC+5:30)
+    # If we add 5h 30m to server UTC time, we get approx IST time.
+    server_now = datetime.utcnow()
+    now_ist = server_now + timedelta(hours=5, minutes=30)
+    
+    # Use adjusted time for filtering
+    # 1. Upcoming events
+    upcoming_query = query.filter(Event.start_time >= now_ist).order_by(Event.start_time.asc())
+    
+    # 2. Past events
+    past_query = query.filter(Event.start_time < now_ist).order_by(Event.start_time.desc())
 
     # Combine results
     # Note: Pagination (skip/limit) logic becomes complex with split queries. 
