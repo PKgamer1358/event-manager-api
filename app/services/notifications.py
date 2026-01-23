@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.core.firebase import send_fcm
 from app.database import SessionLocal
@@ -18,7 +18,7 @@ def store_web_notification(user_id: int, title: str, body: str):
             user_id=user_id,
             title=title,
             body=body,
-            notify_at=datetime.now()
+            notify_at=datetime.utcnow() + timedelta(hours=5, minutes=30)
         )
         db.add(notif)
         db.commit()
