@@ -59,11 +59,16 @@ def send_notification(user, title, body):
 def send_due_notifications():
     db: Session = SessionLocal()
     try:
-        now = datetime.now()
+        # 🕒 TIMEZONE FIX:
+        # Server is likely UTC. DB timestamps are naive IST.
+        # We must compare IST to IST.
+        from datetime import timedelta
+        server_now = datetime.utcnow()
+        now_ist = server_now + timedelta(hours=5, minutes=30)
 
         notifications = (
             db.query(Notification)            .filter(
-                Notification.notify_at <= now,
+                Notification.notify_at <= now_ist,
                 Notification.delivered == False
             )
             .all()
