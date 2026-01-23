@@ -34,6 +34,13 @@ def register_for_event(
             detail="Event not found"
         )
 
+    # 1.5 Check if event is in the past
+    if event.start_time < datetime.now():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot register for a past event"
+        )
+
     # 2️⃣ Check if already registered for this event
     existing_registration = db.query(Registration).filter(
         Registration.user_id == current_user.id,
