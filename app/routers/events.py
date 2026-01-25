@@ -15,6 +15,7 @@ from fastapi.responses import StreamingResponse
 import io
 import cloudinary
 import cloudinary.uploader
+from app.services.media import upload_to_cloudinary
 
 
 router = APIRouter(prefix="/events", tags=["Events"])
@@ -242,6 +243,53 @@ def update_event(
     )
 
 
+@router.post("/{event_id}/cover-image", response_model=MessageResponse)
+async def upload_cover_image(
+    event_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """
+    Upload cover image for an event (admin only).
+    Replaces existing cover image if any.
+    """
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Event not found"
+        )
+    
+    # Upload to Cloudinary
+    try:
+        upload_result = upload_to_cloudinary(
+            file.file, 
+            folder=f"events/event_{event_id}/cover",
+            resource_type="image"
+        )
+        
+        # Get secure URL
+        file_url = upload_result.get("secure_url")
+        
+        # Update event
+        event.image_url = file_url
+        db.commit()
+        
+        return MessageResponse(
+            message="Cover image uploaded successfully",
+            detail=f"Image URL: {file_url}"
+        )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        print(f"Cover upload error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Cover upload failed: {str(e)}"
+        )
+
+
 @router.post("/{event_id}/upload", response_model=MessageResponse)
 async def upload_event_media(
     event_id: int,
@@ -277,10 +325,10 @@ async def upload_event_media(
     # Upload to Cloudinary
     try:
         # folder="events/event_{event_id}" organizes files in Cloudinary
-        upload_result = cloudinary.uploader.upload(
+        upload_result = upload_to_cloudinary(
             file.file, 
             folder=f"events/event_{event_id}",
-            resource_type="auto" # Auto-detect image vs raw (pdf/docs)
+            resource_type="auto"
         )
         
         # Get secure URL
@@ -300,6 +348,8 @@ async def upload_event_media(
             message="File uploaded successfully",
             detail=f"Media ID: {media.id}"
         )
+    except HTTPException as e:
+        raise e
     except Exception as e:
         print(f"Cloudinary upload error: {e}")
         raise HTTPException(

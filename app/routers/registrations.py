@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session, joinedload
 from typing import List
 from io import BytesIO
@@ -12,6 +12,7 @@ from app.dependencies import get_current_user, get_current_admin_user
 from app.utils.permissions import can_manage_event
 from datetime import datetime, timedelta
 from app.services.notifications import schedule_notification, send_notification
+from app.services.email import send_registration_confirmation
 
 # IST Offset
 IST_OFFSET = timedelta(hours=5, minutes=30)
@@ -26,6 +27,7 @@ router = APIRouter(prefix="/registrations", tags=["Registrations"])
 )
 def register_for_event(
     event_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -101,6 +103,9 @@ def register_for_event(
         )
     except Exception as e:
         print(f"Error sending immediate notification: {e}")
+
+    # 5.6️⃣ Send Email Confirmation
+    background_tasks.add_task(send_registration_confirmation, current_user, event)
 
     # 6️⃣ Schedule reminders
     event_start = event.start_time

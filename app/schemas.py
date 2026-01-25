@@ -137,8 +137,7 @@ class EventResponse(EventBase):
     created_at: datetime
     registered_count: int
     is_full: bool
-    image_url: Optional[str]
-    image_url: Optional[str]
+    image_url: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
