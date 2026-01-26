@@ -46,15 +46,19 @@ def schedule_notification(
     finally:
         db.close()
 def send_notification(user, title, body):
+    # 1. ALWAYS store in the database (so it shows in the "Notifications" tab)
+    store_web_notification(user.id, title, body)
+
+    # 2. If they have a phone connected, ALSO send a push
     if user.fcm_token:
-        send_fcm(
-            token=user.fcm_token,
-            title=title,
-            body=body
-        )
-    else:
-        # web users will receive via polling / API trigger
-        store_web_notification(user.id, title, body)
+        try:
+            send_fcm(
+                token=user.fcm_token,
+                title=title,
+                body=body
+            )
+        except Exception as e:
+            print(f"Failed to send Push Notification: {e}")
 
 def send_due_notifications():
     db: Session = SessionLocal()
