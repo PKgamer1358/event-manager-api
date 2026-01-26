@@ -168,10 +168,10 @@ def unregister_from_event(
     # Check 5-day rule
     event = registration.event
     now_ist = datetime.utcnow() + IST_OFFSET
-    if event.start_time - now_ist <= timedelta(days=5):
+    if event.start_time - now_ist <= timedelta(days=3):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You cannot unregister within 5 days of the event start date"
+            detail="You cannot unregister within 3 days of the event start date"
         )
 
     db.delete(registration)
