@@ -1,38 +1,48 @@
 from fastapi import BackgroundTasks
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import requests
 from app.config import settings
 from app.models import User, Event
 
-def send_email(to_email: str, subject: str, body: str):
-    if not settings.SMTP_SERVER or not settings.SMTP_USERNAME or not settings.SMTP_PASSWORD:
-        print("SMTP settings not configured. Email not sent.")
+def send_email(to_email: str, subject: str, html_content: str):
+    """
+    Sends an email using Brevo (Sendinblue) API v3.
+    Use this to bypass port blocking on Render.
+    """
+    if not settings.BREVO_API_KEY:
+        print("❌ Brevo API key not found. Email not sent.")
         return
 
+    url = "https://api.brevo.com/v3/smtp/email"
+    
+    headers = {
+        "accept": "application/json",
+        "api-key": settings.BREVO_API_KEY,
+        "content-type": "application/json"
+    }
+    
+    payload = {
+        "sender": {
+            "name": "Event Manager",
+            "email": settings.SMTP_FROM_EMAIL if settings.SMTP_FROM_EMAIL else "no-reply@eventmanager.com"
+        },
+        "to": [
+            {
+                "email": to_email,
+                "name": to_email.split("@")[0]
+            }
+        ],
+        "subject": subject,
+        "htmlContent": html_content
+    }
+
     try:
-        msg = MIMEMultipart()
-        msg['From'] = settings.SMTP_FROM_EMAIL
-        msg['To'] = to_email
-        msg['Subject'] = subject
-
-        msg.attach(MIMEText(body, 'html'))
-
-        if settings.SMTP_PORT == 465:
-            # SSL Connection (Port 465)
-            with smtplib.SMTP_SSL(settings.SMTP_SERVER, settings.SMTP_PORT) as server:
-                server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-                server.send_message(msg)
+        response = requests.post(url, json=payload, headers=headers)
+        if response.status_code == 201:
+            print(f"✅ Email sent successfully to {to_email} (via Brevo)")
         else:
-            # TLS Connection (Port 587)
-            with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT) as server:
-                server.starttls()
-                server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-                server.send_message(msg)
-        
-        print(f"Email sent successfully to {to_email}")
+            print(f"❌ Failed to send email via Brevo: {response.status_code} - {response.text}")
     except Exception as e:
-        print(f"Failed to send email to {to_email}: {e}")
+        print(f"❌ Exception sending email via Brevo: {e}")
 
 def send_registration_confirmation(user: User, event: Event):
     subject = f"Registration Confirmed: {event.title}"
@@ -58,5 +68,5 @@ def send_registration_confirmation(user: User, event: Event):
     </html>
     """
     
-    # We'll use this function directly or via background tasks
+    # Send using Brevo
     send_email(user.email, subject, body)
