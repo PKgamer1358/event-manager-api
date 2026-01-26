@@ -40,7 +40,7 @@ def send_registration_confirmation(user: User, event: Event):
             <ul>
                 <li><strong>Date:</strong> {event.start_time.strftime('%Y-%m-%d')}</li>
                 <li><strong>Time:</strong> {event.start_time.strftime('%I:%M %p')}</li>
-                <li><strong>Location:</strong> {event.location}</li>
+                <li><strong>Location:</strong> {event.venue}</li>
             </ul>
             
             <p>We look forward to seeing you there!</p>
