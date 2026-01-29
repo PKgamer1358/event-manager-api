@@ -43,7 +43,7 @@ def can_manage_event(user: User, event: Event) -> bool:
     )
 
 
-@router.post("", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
 def create_event(
     event_data: EventCreate,
     db: Session = Depends(get_db),
@@ -77,10 +77,7 @@ def create_event(
     db.commit()
     db.refresh(new_event)
     
-    return MessageResponse(
-        message="Event created successfully",
-        detail=f"Event ID: {new_event.id}"
-    )
+    return new_event
 
 
 @router.get("", response_model=list[EventResponse])
