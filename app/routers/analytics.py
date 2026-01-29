@@ -25,7 +25,10 @@ def event_analytics(
         .count()
     )
 
-    remaining = max(event.capacity - registered_count, 0)
+    if event.capacity is not None:
+        remaining = max(event.capacity - registered_count, 0)
+    else:
+        remaining = 0  # Unlimited capacity case
 
     return {
         "labels": ["Registered", "Remaining"],
