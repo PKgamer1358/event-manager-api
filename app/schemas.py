@@ -112,7 +112,7 @@ class EventBase(BaseModel):
     venue: Optional[str] = None
     start_time: datetime
     end_time: Optional[datetime] = None
-    capacity: Optional[int] = Field(None, ge=1)
+    capacity: Optional[int] = Field(None)
     image_url: Optional[str] = None
 
 class EventCreate(EventBase):
