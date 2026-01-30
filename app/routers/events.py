@@ -39,7 +39,7 @@ def can_manage_event(user: User, event: Event) -> bool:
     )
     return (
         user.is_super_admin or
-        (user.is_admin and event.created_by == user.id)
+        user.is_admin
     )
 
 
