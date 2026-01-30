@@ -218,18 +218,10 @@ def update_event(
         )
 
     # Update fields when provided
-    if event_data.title is not None:
-        event.title = event_data.title
-    if event_data.description is not None:
-        event.description = event_data.description
-    if event_data.venue is not None:
-        event.venue = event_data.venue
-    if event_data.start_time is not None:
-        event.start_time = event_data.start_time
-    if event_data.end_time is not None:
-        event.end_time = event_data.end_time
-    if event_data.capacity is not None:
-        event.capacity = event_data.capacity
+    # Update fields when provided (using exclude_unset to handle explicit nulls)
+    update_data = event_data.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(event, key, value)
 
     db.commit()
     db.refresh(event)
