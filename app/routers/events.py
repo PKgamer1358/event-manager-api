@@ -187,7 +187,7 @@ def delete_event(
     )
 
 
-@router.put("/{event_id}", response_model=MessageResponse)
+@router.put("/{event_id}", response_model=EventResponse)
 def update_event(
     event_id: int,
     event_data: EventUpdate,
@@ -234,10 +234,7 @@ def update_event(
     db.commit()
     db.refresh(event)
 
-    return MessageResponse(
-        message="Event updated successfully",
-        detail=f"Event ID: {event.id}"
-    )
+    return event
 
 
 @router.post("/{event_id}/cover-image", response_model=MessageResponse)
