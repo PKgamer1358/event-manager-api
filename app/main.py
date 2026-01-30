@@ -26,6 +26,19 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+import logging
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    logging.error(f"Validation Error: {exc.errors()}")
+    logging.error(f"Request Body: {await request.body()}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": str(exc)},
+    )
+
 
 
 
