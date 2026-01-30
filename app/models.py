@@ -114,7 +114,7 @@ class Event(Base):
 
     @property
     def is_full(self) -> bool:
-        if self.capacity is None:
+        if self.capacity is None or self.capacity <= 0:
             return False
         return self.registered_count >= self.capacity
 
