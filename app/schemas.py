@@ -128,7 +128,7 @@ class EventUpdate(BaseModel):
     venue: Optional[str] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
-    capacity: Optional[int] = Field(None, ge=1)
+    capacity: Optional[int] = Field(None) # Removed ge=1 for updates to be safe
 
 
 class EventResponse(EventBase):
