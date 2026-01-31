@@ -38,3 +38,6 @@ build/
 node_modules/
 app/core/firebase-service-account.json
 *.log
+
+# Local Documentation
+API_CODE_EXPLANATION.md
