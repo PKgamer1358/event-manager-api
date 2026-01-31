@@ -121,7 +121,7 @@ def register_for_event(
             user_id=current_user.id,
             title=f"Upcoming Tomorrow: {event.title}",
             body=f"Don't forget! {event.title} is tomorrow at {event.start_time.strftime('%I:%M %p')}",
-            notify_at=one_day_before
+            notify_at=one_day_before - IST_OFFSET
         )
 
     # 3 Hours Before (Standard)
@@ -130,7 +130,7 @@ def register_for_event(
             user_id=current_user.id,
             title=f"Starting Soon: {event.title}",
             body=f"Get ready! {event.title} starts soon at {event.start_time.strftime('%I:%M %p')}",
-            notify_at=three_hours_before
+            notify_at=three_hours_before - IST_OFFSET
         )
 
     return MessageResponse(

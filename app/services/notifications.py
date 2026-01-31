@@ -11,14 +11,15 @@ from app.services.push import send_push_notification  # adjust if needed
 # scheduler = BackgroundScheduler()
 # scheduler.start()
 
-def store_web_notification(user_id: int, title: str, body: str):
+def store_web_notification(user_id: int, title: str, body: str, delivered: bool = False):
     db = SessionLocal()
     try:
         notif = Notification(
             user_id=user_id,
             title=title,
             body=body,
-            notify_at=datetime.utcnow() + timedelta(hours=5, minutes=30)
+            notify_at=datetime.utcnow(),
+            delivered=delivered
         )
         db.add(notif)
         db.commit()
@@ -47,7 +48,8 @@ def schedule_notification(
         db.close()
 def send_notification(user, title, body):
     # 1. ALWAYS store in the database (so it shows in the "Notifications" tab)
-    store_web_notification(user.id, title, body)
+    # Mark as delivered since we are sending it immediately below
+    store_web_notification(user.id, title, body, delivered=True)
 
     # 2. If they have a phone connected, ALSO send a push
     if user.fcm_token:
@@ -64,15 +66,13 @@ def send_due_notifications():
     db: Session = SessionLocal()
     try:
         # 🕒 TIMEZONE FIX:
-        # Server is likely UTC. DB timestamps are naive IST.
-        # We must compare IST to IST.
-        from datetime import timedelta
+        # We store notify_at in UTC (converted before saving).
+        # So we compare against server UTC time.
         server_now = datetime.utcnow()
-        now_ist = server_now + timedelta(hours=5, minutes=30)
 
         notifications = (
             db.query(Notification)            .filter(
-                Notification.notify_at <= now_ist,
+                Notification.notify_at <= server_now,
                 Notification.delivered == False
             )
             .all()
