@@ -60,16 +60,19 @@ def register_for_event(
         )
 
     # 3️⃣ 🔥 CHECK OVERLAPPING EVENTS (THIS IS THE IMPORTANT PART)
-    overlapping_events = (
-        db.query(Event)
-        .join(Registration, Registration.event_id == Event.id)
-        .filter(Registration.user_id == current_user.id)
-        .filter(
-            Event.start_time < event.end_time,
-            Event.end_time > event.start_time
+    # 3️⃣ 🔥 CHECK OVERLAPPING EVENTS
+    overlapping_events = []
+    if event.end_time:
+        overlapping_events = (
+            db.query(Event)
+            .join(Registration, Registration.event_id == Event.id)
+            .filter(Registration.user_id == current_user.id)
+            .filter(
+                Event.start_time < event.end_time,
+                Event.end_time > event.start_time
+            )
+            .all()
         )
-        .all()
-    )
 
     if overlapping_events:
         raise HTTPException(
