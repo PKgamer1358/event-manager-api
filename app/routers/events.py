@@ -11,7 +11,8 @@ from app.models import User, Event, EventMedia
 from app.schemas import EventCreate, EventResponse, MessageResponse, EventUpdate, EventMediaResponse
 from app.dependencies import get_current_user, get_current_admin_user
 from app.utils.permissions import can_manage_event
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile
+from fastapi.responses import RedirectResponse
 import io
 import cloudinary
 import cloudinary.uploader
