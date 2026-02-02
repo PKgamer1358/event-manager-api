@@ -469,6 +469,42 @@ def download_media(
     return {"download_url": download_url}
 
 
+@router.get("/{event_id}/media/{media_id}/download-file")
+def download_media_file(
+    event_id: int,
+    media_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Redirects directly to the signed download URL for the media file.
+    This bypasses client-side download restrictions.
+    """
+    # Reuse logic from download_media, but return RedirectResponse
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    media = db.query(EventMedia).filter(EventMedia.id == media_id, EventMedia.event_id == event_id).first()
+    if not media:
+        raise HTTPException(status_code=404, detail="Media not found")
+
+    if not media.file_url:
+        raise HTTPException(status_code=400, detail="No file URL associated with this media")
+
+    parsed = parse_cloudinary_url(media.file_url)
+    if not parsed:
+        return RedirectResponse(url=media.file_url)
+
+    download_url = generate_download_url(
+        public_id=parsed["public_id"],
+        resource_type=parsed["resource_type"],
+        format=parsed["format"],
+        version=parsed["version"]
+    )
+    
+    return RedirectResponse(url=download_url)
+
+
 # --- AI INSIGHTS ---
 
 from pydantic import BaseModel
