@@ -474,7 +474,15 @@ def download_media(
     # Safe bet: If it's not an image extension, maybe treat carefully? 
     # For now, let's try 'image' for images/pdfs and 'raw' for others.
     
-    download_url = generate_download_url(public_id, resource_type=resource_type)
+    # Try to extract format (extension) from the URL
+    # Cloudinary URLs: .../upload/v123/folder/file.pdf
+    import os
+    _, ext = os.path.splitext(media.file_url)
+    fmt = None
+    if ext:
+        fmt = ext.lower().lstrip(".") # e.g. "pdf"
+    
+    download_url = generate_download_url(public_id, resource_type=resource_type, format=fmt)
     
     return {"download_url": download_url}
 

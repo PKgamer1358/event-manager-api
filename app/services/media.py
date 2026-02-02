@@ -54,7 +54,7 @@ def extract_public_id(file_url: str, folder_prefix: str = "events") -> str:
         return ""
     return ""
 
-def generate_download_url(public_id: str, resource_type: str = "image") -> str:
+def generate_download_url(public_id: str, resource_type: str = "image", format: str = None) -> str:
     """
     Generates a signed download URL (using fl_attachment).
     """
@@ -64,6 +64,7 @@ def generate_download_url(public_id: str, resource_type: str = "image") -> str:
     url, options = cloudinary.utils.cloudinary_url(
         public_id,
         resource_type=resource_type,
+        format=format,
         flags="attachment",
         sign_url=True # IMPORTANT: Signs the URL to allow transformation if strict
     )
