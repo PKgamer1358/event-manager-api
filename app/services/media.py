@@ -37,7 +37,8 @@ def parse_cloudinary_url(url: str):
     # /resource_type/type/(v_version/)?public_id.format
     # Example: https://res.cloudinary.com/cloudname/image/upload/v1234/folder/file.jpg
     
-    pattern = r"\/([^\/]+)\/([^\/]+)\/(?:v(\d+)\/)?(.+?)(?:\.(\w+))?$"
+    # We use specific enums for resource_type and type to avoid matching the domain (res.cloudinary.com)
+    pattern = r"\/(image|video|raw)\/(upload|private|authenticated)\/(?:v(\d+)\/)?(.+?)(?:\.(\w+))?$"
     match = re.search(pattern, url)
     
     if not match:
