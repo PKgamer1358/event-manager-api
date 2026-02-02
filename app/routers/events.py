@@ -15,7 +15,7 @@ from fastapi.responses import StreamingResponse
 import io
 import cloudinary
 import cloudinary.uploader
-from app.services.media import upload_to_cloudinary, extract_public_id, generate_download_url
+from app.services.media import upload_to_cloudinary, parse_cloudinary_url, generate_download_url
 
 
 router = APIRouter(prefix="/events", tags=["Events"])
@@ -400,22 +400,26 @@ def delete_event_media(
     # 4. Remove file from Cloudinary
     if media.file_url:
         try:
-            public_id = extract_public_id(media.file_url)
+            parsed = parse_cloudinary_url(media.file_url)
             
-            if public_id:
+            if parsed:
                 cloudinary.config( 
                     cloud_name = settings.CLOUDINARY_CLOUD_NAME, 
                     api_key = settings.CLOUDINARY_API_KEY, 
                     api_secret = settings.CLOUDINARY_API_SECRET 
                 )
                 
-                # Try deleting as image (default) then raw
-                # Note: 'destroy' returns {'result': 'ok'} or {'result': 'not found'}
+                # For deletion, we need public_id.
+                # If resource_type is raw, we might need extension in public_id or specify type
                 
-                res = cloudinary.uploader.destroy(public_id)
-                if res.get("result") != "ok":
-                     # Try raw
-                     cloudinary.uploader.destroy(public_id, resource_type="raw")
+                public_id = parsed["public_id"]
+                if parsed["resource_type"] == "raw" and parsed["format"]:
+                     public_id = f"{public_id}.{parsed['format']}"
+                
+                cloudinary.uploader.destroy(
+                    public_id, 
+                    resource_type=parsed["resource_type"]
+                )
 
         except Exception as e:
             print(f"Error deleting file from Cloudinary: {e}")
@@ -450,39 +454,17 @@ def download_media(
     if not media.file_url:
         raise HTTPException(status_code=400, detail="No file URL associated with this media")
 
-    public_id = extract_public_id(media.file_url)
-    if not public_id:
-        # Fallback to original URL if we can't extract ID (unlikely)
+    parsed = parse_cloudinary_url(media.file_url)
+    if not parsed:
+        # Fallback
         return {"download_url": media.file_url}
 
-    # Determine resource type
-    # If we stored file_type, we can use it.
-    # Cloudinary defaults: image (jpg, png, pdf pages), raw (doc, zip, etc), video
-    # We used "auto" in upload.
-    # If media.file_type says "pdf", it might be image or raw depending on how cloudinary treated it.
-    # Usually PDFs uploaded as "auto" become "image" type (paged).
-    # Docs are "raw".
-    
-    resource_type = "image"
-    if media.file_type == "document": # .doc, .docx, etc
-        resource_type = "raw"
-    # PDF is legally "image" in Cloudinary context usually if strictly uploaded, 
-    # but let's default to image and hope. 
-    # Actually, `generate_download_url` generates a URL. 
-    # If we guess wrong transform might fail or URL be invalid.
-    
-    # Safe bet: If it's not an image extension, maybe treat carefully? 
-    # For now, let's try 'image' for images/pdfs and 'raw' for others.
-    
-    # Try to extract format (extension) from the URL
-    # Cloudinary URLs: .../upload/v123/folder/file.pdf
-    import os
-    _, ext = os.path.splitext(media.file_url)
-    fmt = None
-    if ext:
-        fmt = ext.lower().lstrip(".") # e.g. "pdf"
-    
-    download_url = generate_download_url(public_id, resource_type=resource_type, format=fmt)
+    download_url = generate_download_url(
+        public_id=parsed["public_id"],
+        resource_type=parsed["resource_type"],
+        format=parsed["format"],
+        version=parsed["version"]
+    )
     
     return {"download_url": download_url}
 
