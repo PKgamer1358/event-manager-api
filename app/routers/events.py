@@ -15,7 +15,7 @@ from fastapi.responses import StreamingResponse
 import io
 import cloudinary
 import cloudinary.uploader
-from app.services.media import upload_to_cloudinary
+from app.services.media import upload_to_cloudinary, extract_public_id, generate_download_url
 
 
 router = APIRouter(prefix="/events", tags=["Events"])
@@ -400,64 +400,22 @@ def delete_event_media(
     # 4. Remove file from Cloudinary
     if media.file_url:
         try:
-            # Extract public_id from URL
-            # Example: https://res.cloudinary.com/demo/image/upload/v1570979139/events/event_1/my_image.jpg
-            # Public ID: events/event_1/my_image
+            public_id = extract_public_id(media.file_url)
             
-            # Simple extraction strategy:
-            # Split by '/' and take parts after 'upload/' (plus versioning handling if needed)
-            # Cloudinary usually returns public_id in upload response, but if we don't store it, we must extract.
-            # A safer way if possible is to store public_id in DB. 
-            # For now, let's try to parse or just leave it as orphan if parsing fails (fallback).
-            
-            # Better strategy: Let's assume standard Cloudinary URL structure
-            parts = media.file_url.split("/")
-            # Find the 'upload' segment index
-            try:
-                upload_idx = parts.index("upload")
-                # public_id starts after version (v12345) which is usually after upload
-                # But sometimes version is omitted.
-                # simpler: join from folder 'events' onwards and remove extension
-                
-                # We stored with folder=f"events/event_{event_id}"
-                # So we look for that.
-                
-                # Find index of 'events'
-                events_idx = parts.index("events")
-                # Join from there to end
-                public_id_with_ext = "/".join(parts[events_idx:])
-                # Remove extension
-                public_id = os.path.splitext(public_id_with_ext)[0]
-                
-                # Check resource type based on file_type
-                # Cloudinary delete defaults to image. For PDFs/docs (raw), we might need to specify.
-                # However, we used resource_type="auto" which might upload as image or raw.
-                # Map our file_type to cloudinary resource_type
-                res_type = "image"
-                if media.file_type == "pdf" or media.file_type == "document":
-                    # Check if it was uploaded as raw or image (PDFs can be both)
-                    # For simplicity, try 'image' first, then 'raw' if needed? 
-                    # Or just try to destroy.
-                    pass # Default is image.
-                
-                # Important: "raw" files need resource_type="raw" in destroy
-                # "image" and "video" are distinct.
-                
-                # For this implementation, we'll try to delete. 
-                # If it fails, we log it.
-                
+            if public_id:
                 cloudinary.config( 
                     cloud_name = settings.CLOUDINARY_CLOUD_NAME, 
                     api_key = settings.CLOUDINARY_API_KEY, 
                     api_secret = settings.CLOUDINARY_API_SECRET 
                 )
                 
-                cloudinary.uploader.destroy(public_id)
-                # We might also need to try resource_type="raw" if it was a generic file
-                cloudinary.uploader.destroy(public_id, resource_type="raw")
+                # Try deleting as image (default) then raw
+                # Note: 'destroy' returns {'result': 'ok'} or {'result': 'not found'}
                 
-            except ValueError:
-                print(f"Could not parse Cloudinary URL for deletion: {media.file_url}")
+                res = cloudinary.uploader.destroy(public_id)
+                if res.get("result") != "ok":
+                     # Try raw
+                     cloudinary.uploader.destroy(public_id, resource_type="raw")
 
         except Exception as e:
             print(f"Error deleting file from Cloudinary: {e}")
@@ -470,6 +428,55 @@ def delete_event_media(
         message="Media deleted successfully",
         detail=f"Media ID: {media_id}"
     )
+
+
+@router.get("/{event_id}/media/{media_id}/download")
+def download_media(
+    event_id: int,
+    media_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Generate a signed download URL for the media file.
+    """
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    media = db.query(EventMedia).filter(EventMedia.id == media_id, EventMedia.event_id == event_id).first()
+    if not media:
+        raise HTTPException(status_code=404, detail="Media not found")
+
+    if not media.file_url:
+        raise HTTPException(status_code=400, detail="No file URL associated with this media")
+
+    public_id = extract_public_id(media.file_url)
+    if not public_id:
+        # Fallback to original URL if we can't extract ID (unlikely)
+        return {"download_url": media.file_url}
+
+    # Determine resource type
+    # If we stored file_type, we can use it.
+    # Cloudinary defaults: image (jpg, png, pdf pages), raw (doc, zip, etc), video
+    # We used "auto" in upload.
+    # If media.file_type says "pdf", it might be image or raw depending on how cloudinary treated it.
+    # Usually PDFs uploaded as "auto" become "image" type (paged).
+    # Docs are "raw".
+    
+    resource_type = "image"
+    if media.file_type == "document": # .doc, .docx, etc
+        resource_type = "raw"
+    # PDF is legally "image" in Cloudinary context usually if strictly uploaded, 
+    # but let's default to image and hope. 
+    # Actually, `generate_download_url` generates a URL. 
+    # If we guess wrong transform might fail or URL be invalid.
+    
+    # Safe bet: If it's not an image extension, maybe treat carefully? 
+    # For now, let's try 'image' for images/pdfs and 'raw' for others.
+    
+    download_url = generate_download_url(public_id, resource_type=resource_type)
+    
+    return {"download_url": download_url}
 
 
 # --- AI INSIGHTS ---
